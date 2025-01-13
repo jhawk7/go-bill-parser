@@ -1,0 +1,6 @@
+config.json
+credentials.json
+token.json
+run/secrets/*
+*.env
+influxdb-data/

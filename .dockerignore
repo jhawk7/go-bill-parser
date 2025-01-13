@@ -1,0 +1,8 @@
+config.json
+credentials.json
+token.json
+run/secrets/*
+*.env
+Dockerfile
+docker-compose.yml
+influxdb-data/

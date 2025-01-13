@@ -1,0 +1,29 @@
+services:
+  influxdb:
+    image: influxdb:alpine
+    env_file:
+      - ./.influxdb.env
+    ports:
+      - 8086:8086
+    volumes:
+      - ./influxdb-data:/var/lib/influxdb2
+
+  bill-parser:
+    image: jhawk7/go-bill-parser:latest
+    build: .
+    environment:
+      EMAIL_CREDS_FILE: /run/secrets/credentials
+      PARSER_CONFIG: /run/secrets/config
+      GMAIL_API_TOKEN: /run/secrets/token
+    secrets:
+      - credentials
+      - config
+      - token
+  
+secrets:
+  credentials:
+    file: credentials.json
+  config:
+    file: config.json
+  token:
+    file: token.json
