@@ -148,6 +148,7 @@ func parseDollarAmount(text string) (amount string, err error) {
 
 	strAmount := matches[len(matches)-1]
 	strAmount = strings.Replace(strAmount, "$", "", -1)
+	strAmount = strings.Replace(strAmount, ",", "", -1)
 	amount = strings.Trim(strAmount, " ")
 	return
 }
