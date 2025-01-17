@@ -106,6 +106,7 @@ func ParseMessages(messages []*gmail.Message) []*tsdb.Record {
 		}
 
 		if len(text) == 0 {
+			common.LogInfo("no text parsed")
 			continue
 		}
 
