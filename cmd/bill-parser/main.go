@@ -115,7 +115,7 @@ func ParseMessages(messages []*gmail.Message) []*tsdb.Record {
 			continue
 		}
 
-		record, recErr := createRecord(text, amount, message.InternalDate)
+		record, recErr := createRecord(message, amount, text)
 		if recErr != nil {
 			common.LogError(fmt.Errorf("failed to create record; %v", recErr), false)
 			continue
@@ -153,11 +153,26 @@ func parseDollarAmount(text string) (amount string, err error) {
 	return
 }
 
-func createRecord(text string, amount string, epoch int64) (record *tsdb.Record, err error) {
+func createRecord(message *gmail.Message, amount string, text string) (record *tsdb.Record, err error) {
 	var recordType string
-	re := regexp.MustCompile(`[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}`)
-	sender := re.FindString(text)
-	recordType = config.SenderMap[sender]
+
+	parseSender := func(t string) string {
+		re := regexp.MustCompile(`[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}`)
+		sender := re.FindString(t)
+		return config.SenderMap[sender]
+	}
+
+	for _, headers := range message.Payload.Headers {
+		if headers.Name == "From" {
+			recordType = parseSender(headers.Value)
+			break
+		}
+	}
+
+	if len(recordType) == 0 {
+		common.LogInfo("no record type found for sender; parsing text body")
+		recordType = parseSender(text)
+	}
 
 	amountF64, convErr := strconv.ParseFloat(amount, 64)
 	if convErr != nil {
@@ -168,7 +183,7 @@ func createRecord(text string, amount string, epoch int64) (record *tsdb.Record,
 	record = &tsdb.Record{
 		RecordType: recordType,
 		Amount:     amountF64,
-		Timestamp:  time.Unix(0, epoch*int64(time.Millisecond)),
+		Timestamp:  time.UnixMilli(message.InternalDate),
 	}
 
 	fmt.Printf("record type: %v, record amount %v, ts: %v\n", record.RecordType, record.Amount, record.Timestamp)
