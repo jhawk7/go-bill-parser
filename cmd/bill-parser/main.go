@@ -98,7 +98,7 @@ func ParseMessages(messages []*gmail.Message) []*tsdb.Record {
 
 			} else if part.MimeType == "multipart/alternative" {
 				for _, subPart := range part.Parts {
-					if subPart.MimeType == "text/plain" {
+					if subPart.MimeType == "text/plain" || subPart.MimeType == "text/html" {
 						text = decodeMessageTxt(subPart.Body.Data)
 					}
 				}
