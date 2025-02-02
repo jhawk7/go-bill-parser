@@ -3,6 +3,7 @@ credentials.json
 token.json
 run/secrets/*
 *.env
+.env.sh
 Dockerfile
 docker-compose.yml
 influxdb-data/

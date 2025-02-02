@@ -25,27 +25,27 @@ func main() {
 	dbconn = tsdb.InitTSDB(config)
 	svc = gmailsvc.InitGSvc()
 
-	messages, ids, unreadLabelId := GetMessages()
+	messages, unreadLabelId := GetMessages()
 	if len(messages) > 0 {
-		records := ParseMessages(messages)
+		records, parsedEmailIds := ParseMessages(messages)
 		errcount := dbconn.WriteRecords(records)
 
 		if errcount == 0 {
 			// mark emails as read
-			if markErr := markEmailsRead(ids, unreadLabelId); markErr != nil {
+			if markErr := markEmailsRead(parsedEmailIds, unreadLabelId); markErr != nil {
 				common.LogError(fmt.Errorf("failed to mark emails as read; %v", markErr), false)
 			} else {
-				common.LogInfo(fmt.Sprintf("marked %v messages as read", len(ids)))
+				common.LogInfo(fmt.Sprintf("marked %v messages as read", len(parsedEmailIds)))
 			}
 		}
 	}
 }
 
-func GetMessages() ([]*gmail.Message, []string, string) {
+func GetMessages() ([]*gmail.Message, string) {
 	labelRes, lErr := svc.Users.Labels.List("me").Fields().Do()
 	if lErr != nil {
 		common.LogError(fmt.Errorf("failed to get mail labels; %v", lErr), false)
-		return nil, nil, ""
+		return nil, ""
 	}
 
 	var customLabelId string
@@ -68,7 +68,6 @@ func GetMessages() ([]*gmail.Message, []string, string) {
 	}
 
 	var messages []*gmail.Message
-	var ids []string
 
 	for _, m := range listRes.Messages {
 		msg, mErr := svc.Users.Messages.Get("me", m.Id).Do()
@@ -77,16 +76,14 @@ func GetMessages() ([]*gmail.Message, []string, string) {
 			continue
 		}
 
-		ids = append(ids, m.Id)
 		messages = append(messages, msg)
 	}
 
 	common.LogInfo(fmt.Sprintf("%v messages found", len(messages)))
-	return messages, ids, unreadLabelId
+	return messages, unreadLabelId
 }
 
-func ParseMessages(messages []*gmail.Message) []*tsdb.Record {
-	var records []*tsdb.Record
+func ParseMessages(messages []*gmail.Message) (records []*tsdb.Record, parsedEmailIds []string) {
 
 	for _, message := range messages {
 		//get body of message
@@ -121,11 +118,13 @@ func ParseMessages(messages []*gmail.Message) []*tsdb.Record {
 			common.LogError(fmt.Errorf("failed to create record; %v", recErr), false)
 			continue
 		}
+
+		parsedEmailIds = append(parsedEmailIds, message.Id)
 		records = append(records, record)
 	}
 
 	common.LogInfo(fmt.Sprintf("created %v record(s)", len(records)))
-	return records
+	return records, parsedEmailIds
 }
 
 func decodeMessageTxt(body string) (text string) {
@@ -194,6 +193,9 @@ func createRecord(message *gmail.Message, amount string, text string) (record *t
 
 func markEmailsRead(ids []string, unreadLabelId string) error {
 	// mark emails as read
+	if len(ids) == 0 {
+		return fmt.Errorf("no email ids given")
+	}
 	removeLabelReq := gmail.BatchModifyMessagesRequest{
 		Ids:            ids,
 		RemoveLabelIds: []string{unreadLabelId},
