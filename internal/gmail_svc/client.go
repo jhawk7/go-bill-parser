@@ -22,6 +22,7 @@ func getClient(config *oauth2.Config) *http.Client {
 	tokFile := os.Getenv("GMAIL_API_TOKEN")
 	tok, err := tokenFromFile(tokFile)
 	if err != nil {
+		common.LogError(fmt.Errorf("token file not read or doesn't exist; %v", err), false)
 		tok = getTokenFromWeb(config)
 		saveToken(tokFile, tok)
 	}
