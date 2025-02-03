@@ -69,6 +69,7 @@ func GetMessages() ([]*gmail.Message, string) {
 
 	var messages []*gmail.Message
 
+	//get actual messages by ids
 	for _, m := range listRes.Messages {
 		msg, mErr := svc.Users.Messages.Get("me", m.Id).Do()
 		if mErr != nil {
@@ -85,21 +86,36 @@ func GetMessages() ([]*gmail.Message, string) {
 
 func ParseMessages(messages []*gmail.Message) (records []*tsdb.Record, parsedEmailIds []string) {
 
+	parseMultipartContent := func(parts []*gmail.MessagePart) (text string) {
+		for _, part := range parts {
+			if part.MimeType == "text/plain" || part.MimeType == "text/html" {
+				common.LogInfo(fmt.Sprintf("%v found", part.MimeType))
+				text = decodeMessageTxt(part.Body.Data)
+				return
+
+			} else if part.MimeType == "multipart/alternative" {
+				common.LogInfo(fmt.Sprintf("%v found", part.MimeType))
+				for _, subPart := range part.Parts {
+					if subPart.MimeType == "text/plain" || subPart.MimeType == "text/html" {
+						text = decodeMessageTxt(subPart.Body.Data)
+						return
+					}
+				}
+			}
+		}
+		return
+	}
+
 	for _, message := range messages {
 		//get body of message
 
 		var text string
-		for _, part := range message.Payload.Parts {
-			if part.MimeType == "text/plain" || part.MimeType == "text/html" {
-				text = decodeMessageTxt(part.Body.Data)
-
-			} else if part.MimeType == "multipart/alternative" {
-				for _, subPart := range part.Parts {
-					if subPart.MimeType == "text/plain" {
-						text = decodeMessageTxt(subPart.Body.Data)
-					}
-				}
-			}
+		if len(message.Payload.Parts) > 0 {
+			common.LogInfo("parsing multipart content")
+			text = parseMultipartContent(message.Payload.Parts)
+		} else {
+			common.LogInfo("parsing standard email body")
+			text = decodeMessageTxt(message.Payload.Body.Data)
 		}
 
 		if len(text) == 0 {
